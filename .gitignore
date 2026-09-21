@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+*.log
+
+# database backups contain your personal data - keep them off GitHub
+db-backup/

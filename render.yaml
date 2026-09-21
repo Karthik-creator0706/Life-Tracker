@@ -1,0 +1,24 @@
+# Render Blueprint: one web service (API + the built app). The database lives on Neon (neon.tech),
+# so it is not deleted after 30 days. Render dashboard -> New -> Blueprint -> pick this repo,
+# then paste your Neon connection string when it asks for DATABASE_URL.
+services:
+  - type: web
+    name: life-tracker
+    runtime: node
+    plan: free # free services sleep after 15 minutes without visits (the next visit takes ~30s to wake)
+    # devDependencies are needed to build (typescript, vite, prisma)
+    buildCommand: npm ci --include=dev && npm run build
+    # create/update the tables in Neon, then start
+    startCommand: npm run db:push -w server && npm run start -w server
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: DATABASE_URL
+        sync: false # you paste the Neon connection string in the Render dashboard (never commit it)
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOW_SIGNUP
+        value: "false"
+      - key: TRUST_PROXY
+        value: "true"
