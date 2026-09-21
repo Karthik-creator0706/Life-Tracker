@@ -1,41 +1,83 @@
 import { useCallback, useEffect, useState } from 'react';
 
+/** Backend API base URL */
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 /** Show a toast from anywhere (rendered by <Toaster />). */
-export const notify = (message: string, type: 'success' | 'error' = 'success') =>
-  window.dispatchEvent(new CustomEvent('app:toast', { detail: { message, type } }));
+export const notify = (
+  message: string,
+  type: 'success' | 'error' = 'success'
+) =>
+  window.dispatchEvent(
+    new CustomEvent('app:toast', {
+      detail: { message, type },
+    })
+  );
 
 const TOKEN_KEY = 'lt_token';
 
 export const getToken = () => {
-  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 };
+
 export const setToken = (token: string | null) => {
-  try { token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY); } catch { /* storage blocked */ }
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  } catch {
+    // Storage blocked
+  }
 };
 
-export async function api<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
+export async function api<T = unknown>(
+  path: string,
+  method = 'GET',
+  body?: unknown
+): Promise<T> {
   const token = getToken();
-  const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
-  if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`/api${path}`, {
+  const headers: Record<string, string> = {};
+
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api${path}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 
-  // Expired or invalid session on a data call: drop the token so the app returns to the login screen.
+  // Expired or invalid session
   if (res.status === 401 && !path.startsWith('/auth/login')) {
     setToken(null);
     window.dispatchEvent(new Event('auth:logout'));
   }
+
   if (!res.ok) {
-    const message = (await res.json().catch(() => null))?.error ?? `Request failed (${res.status})`;
-    // Failed saves/deletes should never be silent (session expiry has its own redirect above).
-    if (method !== 'GET' && res.status !== 401) notify(message, 'error');
+    const message =
+      (await res.json().catch(() => null))?.error ??
+      `Request failed (${res.status})`;
+
+    // Failed saves/deletes should never be silent
+    if (method !== 'GET' && res.status !== 401) {
+      notify(message, 'error');
+    }
+
     throw new Error(message);
   }
+
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
@@ -63,14 +105,24 @@ export function useApi<T>(path: string) {
   return { data, error, loading, reload };
 }
 
-/** Local calendar date as YYYY-MM-DD (not UTC, so it's right late at night / early morning). */
+/** Local calendar date as YYYY-MM-DD. */
 export const today = () => new Date().toLocaleDateString('en-CA');
+
 export const thisMonth = () => today().slice(0, 7);
+
 export const day = (iso: string) => iso.slice(0, 10);
-export const money = (n: number) => n.toLocaleString(undefined, { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 
-/** Tell the rest of the app that to-dos changed (the alerts banner and the To-do page both listen). */
-export const todosChanged = () => window.dispatchEvent(new Event('todos:changed'));
+export const money = (n: number) =>
+  n.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  });
 
-/** Tell the rest of the app that temple visits changed (the reminder banner and the Temple page both listen). */
-export const templeChanged = () => window.dispatchEvent(new Event('temple:changed'));
+/** Tell the rest of the app that to-dos changed. */
+export const todosChanged = () =>
+  window.dispatchEvent(new Event('todos:changed'));
+
+/** Tell the rest of the app that temple visits changed. */
+export const templeChanged = () =>
+  window.dispatchEvent(new Event('temple:changed'));
